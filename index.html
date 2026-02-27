@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>RYFN DJ Maker | Team Pro Studio</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/nexusui@latest/dist/NexusUI.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Noto+Sans+TC:wght@300;500&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg: #0a0a0c; --panel: #16161d; --neon-cyan: #00f2ff; --neon-magenta: #ff00ff; --glass: rgba(255, 255, 255, 0.05); }
+        body { margin: 0; background: var(--bg); color: #fff; font-family: 'Noto Sans TC', sans-serif; overflow: hidden; }
+        
+        /* 側邊欄與導航 */
+        #sidebar { position: fixed; left: -300px; top: 0; width: 300px; height: 100%; background: var(--panel); transition: 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); z-index: 3000; border-right: 1px solid var(--neon-cyan); display: flex; flex-direction: column; }
+        #sidebar.active { left: 0; }
+        .menu-btn { position: fixed; top: 25px; left: 25px; z-index: 3100; cursor: pointer; background: rgba(0,0,0,0.8); border: 1px solid var(--neon-cyan); color: var(--neon-cyan); padding: 10px; border-radius: 8px; font-family: 'Orbitron'; }
+        .nav-item { padding: 18px 25px; border-bottom: 1px solid #222; cursor: pointer; transition: 0.3s; display: flex; align-items: center; gap: 15px; }
+        .nav-item:hover { background: var(--neon-cyan); color: #000; }
+        .nav-bottom { margin-top: auto; border-top: 1px solid #333; }
+
+        /* 介面佈局 */
+        .page { display: none; padding: 80px 40px 40px 40px; height: 100vh; box-sizing: border-box; overflow-y: auto; }
+        .page.active { display: block; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 混音器強化 */
+        .mixer-grid { display: grid; grid-template-columns: 1fr 180px 1fr; gap: 20px; max-width: 1200px; margin: 0 auto; }
+        .deck { background: var(--panel); border-radius: 15px; padding: 25px; border: 1px solid #333; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .viz-box { background: #000; height: 60px; border-radius: 5px; margin-bottom: 15px; border: 1px solid #444; }
+        .deck-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; font-family: 'Orbitron'; color: var(--neon-cyan); }
+        
+        /* 8x8 Pad */
+        .pad-wrapper { max-width: 600px; margin: 0 auto; display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; }
+        .pad { aspect-ratio: 1; background: #2a2a35; border-radius: 6px; cursor: pointer; border-bottom: 4px solid #000; transition: 0.1s; }
+        .pad:active { transform: scale(0.95); border-bottom-width: 0; }
+
+        /* 說明書樣式 */
+        .help-card { background: var(--panel); padding: 30px; border-radius: 15px; max-width: 800px; margin: 0 auto; line-height: 1.8; border-left: 5px solid var(--neon-cyan); }
+        code { color: var(--neon-magenta); background: #000; padding: 2px 6px; border-radius: 4px; }
+
+        /* 滑塊與旋鈕標籤 */
+        .label { font-size: 11px; text-align: center; color: #888; margin-top: 8px; text-transform: uppercase; letter-spacing: 1px; }
+    </style>
+</head>
+<body>
+
+    <button class="menu-btn" onclick="toggleMenu()">☰ MENU</button>
+
+    <nav id="sidebar">
+        <div style="padding: 40px 25px;"><h2 style="font-family:'Orbitron'; color: var(--neon-cyan); margin:0;">RYFN PRO</h2><small>Team Music Station</small></div>
+        <div class="nav-item" onclick="showPage('mixer')">🎧 專業混音母帶台</div>
+        <div class="nav-item" onclick="showPage('pads')">🔳 16-Step 採樣方格</div>
+        <div class="nav-item" onclick="showPage('synth')">🎹 合成器 VST 模擬</div>
+        <div class="nav-item" onclick="showPage('editor')">✂️ 快速音頻編輯</div>
+        <div class="nav-bottom">
+            <div class="nav-item" onclick="showPage('help')" style="color: var(--neon-magenta);">❓ 使用說明書</div>
+        </div>
+    </nav>
+
+    <div id="mixer" class="page active">
+        <div class="mixer-grid">
+            <div class="deck">
+                <div class="deck-header">DECK A <div id="meter-a"></div></div>
+                <div id="scope-a" class="viz-box"></div>
+                <input type="file" id="file-a" accept="audio/*">
+                <div style="display: flex; gap: 20px; margin-top: 20px;">
+                    <div style="flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div id="dial-a-h"></div><div id="dial-a-m"></div>
+                        <div id="dial-a-l"></div><div id="dial-a-f"></div>
+                    </div>
+                    <div id="sld-a-v"></div>
+                </div>
+                <button onclick="play('a')" id="btn-play-a" style="width:100%; margin-top:15px; padding:10px; background:var(--neon-cyan); border:none; border-radius:5px; cursor:pointer; font-weight:bold;">PLAY / CUE</button>
+            </div>
+
+            <div class="center-strip" style="text-align: center; padding-top: 50px;">
+                <div id="master-vol"></div><div class="label">Master</div>
+                <div style="height: 100px;"></div>
+                <div id="xfader"></div><div class="label">Crossfader</div>
+                <div style="margin-top: 30px;">
+                    <span id="bpm-display" style="font-family:'Orbitron'; font-size: 20px; color: var(--neon-cyan);">128</span><br>
+                    <small class="label">BPM Sync</small>
+                </div>
+            </div>
+
+            <div class="deck">
+                <div class="deck-header">DECK B <div id="meter-b"></div></div>
+                <div id="scope-b" class="viz-box"></div>
+                <input type="file" id="file-b" accept="audio/*">
+                <div style="display: flex; gap: 20px; margin-top: 20px;">
+                    <div id="sld-b-v"></div>
+                    <div style="flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div id="dial-b-h"></div><div id="dial-b-m"></div>
+                        <div id="dial-b-l"></div><div id="dial-b-f"></div>
+                    </div>
+                </div>
+                <button onclick="play('b')" id="btn-play-b" style="width:100%; margin-top:15px; padding:10px; background:var(--neon-magenta); border:none; border-radius:5px; cursor:pointer; font-weight:bold; color:white;">PLAY / CUE</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="pads" class="page">
+        <h2 style="text-align:center; font-family:'Orbitron';">DRUM & SAMPLE PAD</h2>
+        <div class="pad-wrapper" id="pad-grid"></div>
+    </div>
+
+    <div id="synth" class="page">
+        <div class="help-card" style="margin-bottom: 20px; text-align: center;">
+            <h3 style="margin:0;">SYNTH ENGINE V1</h3>
+            <p>雙振盪器合成器，支援多點觸控</p>
+        </div>
+        <div id="kb" style="width:100%;"></div>
+        <div style="display:flex; justify-content:center; gap:30px; margin-top:40px;">
+            <div id="s-atk"></div><div id="s-rel"></div><div id="s-cut"></div>
+        </div>
+    </div>
+
+    <div id="editor" class="page">
+        <div class="help-card">
+            <h2>音頻微調編輯器</h2>
+            <p>上傳音軌後，您可以調整其基礎屬性進行母帶預覽。</p>
+            <input type="file" id="edit-in">
+            <hr style="border:0; border-top:1px solid #333; margin:20px 0;">
+            <div id="pitch-shifter"></div><div class="label">Pitch (音高調整)</div>
+        </div>
+    </div>
+
+    <div id="help" class="page">
+        <div class="help-card">
+            <h1 style="color: var(--neon-cyan); font-family: 'Orbitron';">RYFN DJ MAKER 使用手冊</h1>
+            <p>歡迎使用專業音樂團隊協作平台，以下是各模組的功能說明：</p>
+            
+            <h3>1. 專業混音母帶台 (Mixer)</h3>
+            <ul>
+                <li><strong>EQ 三段等化：</strong> 每個 Deck 擁有獨立的 <code>High</code>, <code>Mid</code>, <code>Low</code> 旋鈕。</li>
+                <li><strong>Filter 濾波器：</strong> 旋鈕轉至左側為低通 (LP)，右側為高通 (HP)。</li>
+                <li><strong>Crossfader：</strong> 控制 A 軌與 B 軌的過渡。</li>
+            </ul>
+
+            <h3>2. 採樣方格 (Sampler)</h3>
+            <ul>
+                <li>內建 64 個觸發器。您可以點擊任何方格觸發內建音效。</li>
+                <li><em>團隊技巧：</em> 建議在此分頁加入團隊開發的 Drum Kit 音效。</li>
+            </ul>
+
+            <h3>3. 合成器 (Synth One)</h3>
+            <ul>
+                <li>這是一個 Polyphonic（複音）合成器。</li>
+                <li><strong>ADSR 控制：</strong> 調整 Attack (起音) 與 Release (餘音) 來改變音色質感。</li>
+            </ul>
+
+            <h3>4. 背景播放說明</h3>
+            <p>本系統基於單一 AudioContext 開發，當您在混音台開始播放後，可以隨意切換至鋼琴分頁進行即興演奏，聲音不會中斷。</p>
+            
+            <p style="margin-top:40px; border-top:1px solid #444; padding-top:10px; font-size:12px; color:#666;">
+                RYFN Team Version 2026.02 - 致力於最直覺的音樂創作環境。
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // --- 核心音訊設定 ---
+        const xf = new Tone.CrossFade().toDestination();
+        const master = new Tone.Gain(0.9).connect(xf);
+        
+        function setupDeck(isA) {
+            const player = new Tone.Player();
+            const eq = new Tone.EQ3(0, 0, 0);
+            const filter = new Tone.Filter(20000, "lowpass");
+            const vol = new Tone.Volume(0);
+            const meter = new Tone.Meter();
+            
+            player.chain(eq, filter, vol, meter, isA ? xf.a : xf.b);
+            return { player, eq, filter, vol, meter };
+        }
+
+        const d1 = setupDeck(true);
+        const d2 = setupDeck(false);
+        const synth = new Tone.PolySynth().toDestination();
+
+        // --- Nexus UI 視覺化設定 ---
+        Nexus.colors.accent = "#00f2ff";
+        Nexus.colors.fill = "#2a2a35";
+
+        const toggleMenu = () => document.getElementById('sidebar').classList.toggle('active');
+        const showPage = (id) => {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            toggleMenu();
+        };
+
+        // --- 混音器元件綁定 ---
+        // Deck A
+        new Nexus.Dial('#dial-a-h', {label: 'H'}).on('change', v => d1.eq.high.value = v*20-10);
+        new Nexus.Dial('#dial-a-m', {label: 'M'}).on('change', v => d1.eq.mid.value = v*20-10);
+        new Nexus.Dial('#dial-a-l', {label: 'L'}).on('change', v => d1.eq.low.value = v*20-10);
+        new Nexus.Dial('#dial-a-f', {label: 'F'}).on('change', v => d1.filter.frequency.value = v*10000);
+        new Nexus.Slider('#sld-a-v', {size:[30,120]}).on('change', v => d1.vol.volume.value = Tone.gainToDb(v));
+
+        // Deck B
+        new Nexus.Dial('#dial-b-h').on('change', v => d2.eq.high.value = v*20-10);
+        new Nexus.Dial('#dial-b-m').on('change', v => d2.eq.mid.value = v*20-10);
+        new Nexus.Dial('#dial-b-l').on('change', v => d2.eq.low.value = v*20-10);
+        new Nexus.Dial('#dial-b-f').on('change', v => d2.filter.frequency.value = v*10000);
+        new Nexus.Slider('#sld-b-v', {size:[30,120]}).on('change', v => d2.vol.volume.value = Tone.gainToDb(v));
+
+        new Nexus.Pan('#xfader', {size:[120,30]}).on('change', v => xf.fade.value = v.value);
+
+        // --- 播放邏輯 ---
+        const play = (d) => {
+            const target = (d === 'a') ? d1.player : d2.player;
+            if (target.state === 'started') target.stop();
+            else if (target.loaded) target.start();
+            else alert("請先上傳音檔！");
+        };
+
+        document.getElementById('file-a').onchange = async e => d1.player.load(URL.createObjectURL(e.target.files[0]));
+        document.getElementById('file-b').onchange = async e => d2.player.load(URL.createObjectURL(e.target.files[0]));
+
+        // --- 8x8 Sampler ---
+        const padGrid = document.getElementById('pad-grid');
+        for(let i=0; i<64; i++) {
+            const p = document.createElement('div');
+            p.className = 'pad';
+            p.style.backgroundColor = `hsl(${i * 5}, 50%, 40%)`;
+            p.onclick = () => {
+                synth.triggerAttackRelease("C2", "16n");
+                p.style.filter = "brightness(2)";
+                setTimeout(() => p.style.filter = "none", 100);
+            };
+            padGrid.appendChild(p);
+        }
+
+        // --- Synth One Piano ---
+        new Nexus.Piano('#kb', {size: [1000, 200]}).on('change', v => {
+            if(v.state) synth.triggerAttack(Tone.Frequency(v.note, "midi").toNote());
+            else synth.triggerRelease(Tone.Frequency(v.note, "midi").toNote());
+        });
+    </script>
+</body>
+</html>
