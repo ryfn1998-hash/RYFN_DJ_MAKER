@@ -2,48 +2,80 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>WebGPU 私人無浮水印音樂工廠 2026</title>
+    <title>AI Audio Pro Studio | 本地隱形生成器</title>
     <script type="module">
-        // 導入 2026 年最新的 Transformers.js，支援 WebGPU 直接運算
-        import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
+        import { pipeline, AutoProcessor, MusicgenForConditionalGeneration } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
 
         let synthesizer;
+        let isProcessing = false;
 
-        // 1. 初始化模型 (直接下載到瀏覽器快取)
         async function init() {
-            document.getElementById('status').innerText = "正在初始化 WebGPU 引擎...";
-            synthesizer = await pipeline('text-to-audio', 'Xenova/musicgen-small', {
-                device: 'webgpu', // 強制使用顯卡，速度極快且無雲端追蹤
-            });
-            document.getElementById('status').innerText = "✅ 引擎就緒 (無浮水印模式)";
-            document.getElementById('genBtn').disabled = false;
+            updateStatus("正在下載 WebGPU 核心模型 (約 600MB)...", "orange");
+            try {
+                // 使用 MusicGen-small 作為平衡效能與品質的選擇
+                synthesizer = await pipeline('text-to-audio', 'Xenova/musicgen-small', {
+                    device: 'webgpu', 
+                    dtype: 'fp32'
+                });
+                updateStatus("✅ 專業引擎已就緒 | WebGPU 加速中", "#00ffcc");
+                document.getElementById('genBtn').disabled = false;
+            } catch (e) {
+                updateStatus("錯誤：您的瀏覽器不支援 WebGPU 或顯卡驅動過舊", "red");
+            }
         }
 
-        // 2. 生成與擬人化處理
         async function generate() {
-            const prompt = document.getElementById('prompt').value;
-            document.getElementById('status').innerText = "正在進行本地張量運算 (Raw PCM)...";
+            if (isProcessing) return;
+            isProcessing = true;
             
-            // 生成原始音訊
-            const output = await synthesizer(prompt, {
-                max_new_tokens: 256, // 約 5-10 秒，可調大
-                do_sample: true,
-                temperature: 1.3,    // 提高隨機性，減少 AI 味
-            });
+            const prompt = document.getElementById('prompt').value;
+            const style = document.getElementById('style').value;
+            const duration = parseInt(document.getElementById('duration').value);
+            const guidance = parseFloat(document.getElementById('guidance').value);
+            
+            const fullPrompt = `${style}, ${prompt}`;
+            // 50 tokens 約等於 1 秒
+            const maxTokens = duration * 50;
 
-            // 3. 擬人化：手動注入微小隨機噪音 (Bypass 偵測器)
+            updateStatus(`正在生成 ${duration} 秒音樂 (無浮水印運算)...`, "orange");
+            
+            const startTime = performance.now();
+            const output = await synthesizer(fullPrompt, {
+                max_new_tokens: maxTokens,
+                do_sample: true,
+                guidance_scale: guidance,
+                temperature: 1.1 // 略微增加隨機性，打破 AI 味
+            });
+            const endTime = performance.now();
+
+            // 擬人化：注入物理底噪 (-70dB)
             const audioData = output.audio;
             for (let i = 0; i < audioData.length; i++) {
-                audioData[i] += (Math.random() - 0.5) * 0.001; // 注入 -60dB 底噪
+                audioData[i] += (Math.random() - 0.5) * 0.0005;
             }
 
-            // 導出為 WAV
-            const blob = window.URL.createObjectURL(makeWav(audioData, output.sampling_rate));
-            document.getElementById('player').src = blob;
-            document.getElementById('status').innerText = "✨ 生成完畢！已通過擬人化混淆。";
+            const wavBlob = makeWav(audioData, output.sampling_rate);
+            const url = window.URL.createObjectURL(wavBlob);
+            
+            document.getElementById('player').src = url;
+            document.getElementById('downloadBtn').onclick = () => {
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Private_Music_${Date.now()}.wav`;
+                a.click();
+            };
+            
+            document.getElementById('downloadBtn').style.display = 'block';
+            updateStatus(`完成！耗時: ${((endTime - startTime)/1000).toFixed(1)}s`, "#00ffcc");
+            isProcessing = false;
         }
 
-        // 簡易 WAV 封裝函式 (確保格式純淨)
+        function updateStatus(msg, color) {
+            const s = document.getElementById('status');
+            s.innerText = msg;
+            s.style.color = color;
+        }
+
         function makeWav(samples, sampleRate) {
             const buffer = new ArrayBuffer(44 + samples.length * 2);
             const view = new DataView(buffer);
@@ -62,22 +94,58 @@
         window.generate = generate;
     </script>
     <style>
-        body { background: #050505; color: #00ffcc; font-family: sans-serif; display: flex; justify-content: center; padding: 50px; }
-        .box { background: #111; padding: 30px; border-radius: 20px; border: 1px solid #00ffcc; width: 400px; box-shadow: 0 0 20px #00ffcc44; }
-        textarea { width: 100%; background: #222; border: none; color: white; padding: 10px; border-radius: 10px; margin: 10px 0; }
-        button { width: 100%; padding: 15px; background: #00ffcc; color: black; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }
-        button:disabled { background: #333; color: #666; }
-        #status { font-size: 12px; margin: 10px 0; color: #888; text-align: center; }
+        :root { --main: #00ffcc; --bg: #0a0a0c; }
+        body { background: var(--bg); color: #fff; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .studio-card { width: 450px; background: #16161a; padding: 30px; border-radius: 25px; border: 1px solid #333; box-shadow: 0 20px 80px rgba(0,0,0,0.7); }
+        h2 { font-weight: 800; color: var(--main); text-align: center; letter-spacing: 1px; }
+        .form-item { margin-bottom: 18px; }
+        label { font-size: 12px; color: #888; text-transform: uppercase; margin-bottom: 5px; display: block; }
+        textarea, select, input { width: 100%; background: #222; border: 1px solid #333; border-radius: 10px; color: #fff; padding: 12px; box-sizing: border-box; }
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        button { width: 100%; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        #genBtn { background: var(--main); color: #000; margin-top: 10px; }
+        #genBtn:hover { box-shadow: 0 0 20px rgba(0,255,204,0.4); }
+        #downloadBtn { background: transparent; border: 1px solid var(--main); color: var(--main); margin-top: 10px; display: none; }
+        #status { font-size: 11px; text-align: center; margin: 15px 0; font-family: monospace; }
+        audio { width: 100%; margin-top: 20px; border-radius: 30px; }
     </style>
 </head>
 <body onload="init()">
-    <div class="box">
-        <h3>Private Music Gen (Offline)</h3>
-        <p style="font-size: 11px;">⚠️ 首次開啟需下載約 500MB 模型數據</p>
-        <textarea id="prompt" placeholder="例如：Lo-fi hip hop, smooth saxophone, raining background..."></textarea>
-        <button id="genBtn" disabled onclick="generate()">開始無浮水印生成</button>
-        <div id="status">正在加載 WebGPU 核心...</div>
-        <audio id="player" controls style="width: 100%; margin-top: 20px;"></audio>
+    <div class="studio-card">
+        <h2>AUDIO PRO STUDIO</h2>
+        
+        <div class="form-item">
+            <label>基礎風格 (Base Style)</label>
+            <select id="style">
+                <option value="80s Japanese City Pop, analog warmth">City Pop (城市流行)</option>
+                <option value="Cyberpunk industrial techno, gritty texture">Cyberpunk (賽博龐克)</option>
+                <option value="Lo-fi hip hop, vinyl crackle, chill vibes">Lo-fi (放鬆嘻哈)</option>
+                <option value="Cinematic orchestral, dramatic, high dynamic">Epic (史詩交響)</option>
+                <option value="Modern K-Pop, clean production, energetic">K-Pop (現代流行)</option>
+            </select>
+        </div>
+
+        <div class="form-item">
+            <label>細節描述 (Prompt)</label>
+            <textarea id="prompt" placeholder="例如：帶有憂鬱感的鋼琴，雨聲背景..."></textarea>
+        </div>
+
+        <div class="row">
+            <div class="form-item">
+                <label>生成長度 (秒)</label>
+                <input type="number" id="duration" value="10" min="2" max="30">
+            </div>
+            <div class="form-item">
+                <label>提示詞權重 (Guidance)</label>
+                <input type="number" id="guidance" value="3.5" step="0.5">
+            </div>
+        </div>
+
+        <button id="genBtn" disabled onclick="generate()">生成專業級音訊</button>
+        <div id="status">正在加載驅動模組...</div>
+        
+        <audio id="player" controls></audio>
+        <button id="downloadBtn">下載無浮水印 WAV</button>
     </div>
 </body>
 </html>
