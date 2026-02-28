@@ -2,80 +2,101 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>AI Audio Pro Studio | 本地隱形生成器</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Audio Pro Max | 頂級私人音樂工作站</title>
     <script type="module">
-        import { pipeline, AutoProcessor, MusicgenForConditionalGeneration } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
+        import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
 
         let synthesizer;
-        let isProcessing = false;
+        let isGenerating = false;
 
+        // 初始化 WebGPU 引擎
         async function init() {
-            updateStatus("正在下載 WebGPU 核心模型 (約 600MB)...", "orange");
+            const statusText = document.getElementById('status-text');
+            const progress = document.getElementById('load-progress');
+            
             try {
-                // 使用 MusicGen-small 作為平衡效能與品質的選擇
-                synthesizer = await pipeline('text-to-audio', 'Xenova/musicgen-small', {
-                    device: 'webgpu', 
+                statusText.innerText = "正在喚醒 WebGPU 核心模型 (約 1.2GB)...";
+                progress.style.width = "30%";
+                
+                synthesizer = await pipeline('text-to-audio', 'Xenova/musicgen-medium', {
+                    device: 'webgpu',
                     dtype: 'fp32'
                 });
-                updateStatus("✅ 專業引擎已就緒 | WebGPU 加速中", "#00ffcc");
+                
+                progress.style.width = "100%";
+                statusText.innerText = "✅ 系統就緒 | 無浮水印模式已啟動";
+                statusText.style.color = "#00ffcc";
                 document.getElementById('genBtn').disabled = false;
             } catch (e) {
-                updateStatus("錯誤：您的瀏覽器不支援 WebGPU 或顯卡驅動過舊", "red");
+                statusText.innerText = "錯誤：瀏覽器不支援 WebGPU 或顯存不足";
+                statusText.style.color = "#ff4444";
             }
         }
 
         async function generate() {
-            if (isProcessing) return;
-            isProcessing = true;
+            if (isGenerating) return;
+            isGenerating = true;
             
+            const genBtn = document.getElementById('genBtn');
+            const statusText = document.getElementById('status-text');
+            genBtn.innerText = "運算中 (Neural Processing)...";
+            genBtn.style.opacity = "0.6";
+
+            // 獲取設定值
             const prompt = document.getElementById('prompt').value;
             const style = document.getElementById('style').value;
             const duration = parseInt(document.getElementById('duration').value);
             const guidance = parseFloat(document.getElementById('guidance').value);
+            const temp = parseFloat(document.getElementById('temp').value);
             
-            const fullPrompt = `${style}, ${prompt}`;
-            // 50 tokens 約等於 1 秒
-            const maxTokens = duration * 50;
+            const fullPrompt = `${style}, ${prompt}, high fidelity, masterpiece, studio grade`;
+            const maxTokens = duration * 50; 
 
-            updateStatus(`正在生成 ${duration} 秒音樂 (無浮水印運算)...`, "orange");
-            
-            const startTime = performance.now();
-            const output = await synthesizer(fullPrompt, {
-                max_new_tokens: maxTokens,
-                do_sample: true,
-                guidance_scale: guidance,
-                temperature: 1.1 // 略微增加隨機性，打破 AI 味
-            });
-            const endTime = performance.now();
+            try {
+                const output = await synthesizer(fullPrompt, {
+                    max_new_tokens: maxTokens,
+                    do_sample: true,
+                    guidance_scale: guidance,
+                    temperature: temp
+                });
 
-            // 擬人化：注入物理底噪 (-70dB)
-            const audioData = output.audio;
-            for (let i = 0; i < audioData.length; i++) {
-                audioData[i] += (Math.random() - 0.5) * 0.0005;
+                let audioData = output.audio;
+
+                // --- 擬人化去特徵處理 (Bypass AI Detection) ---
+                // 注入類比底噪與非線性擾動
+                for (let i = 0; i < audioData.length; i++) {
+                    // 加入極微小的隨機漂移，破壞 AI 的完美頻譜
+                    audioData[i] += (Math.random() - 0.5) * 0.0008; 
+                }
+
+                const wavBlob = makeWav(audioData, output.sampling_rate);
+                const url = window.URL.createObjectURL(wavBlob);
+                
+                const player = document.getElementById('player');
+                player.src = url;
+                player.style.display = "block";
+                
+                const downloadBtn = document.getElementById('downloadBtn');
+                downloadBtn.style.display = "block";
+                downloadBtn.onclick = () => {
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `Studio_Pro_${Date.now()}.wav`;
+                    a.click();
+                };
+
+                statusText.innerText = "✨ 生成成功 | 已通過擬人化濾鏡";
+            } catch (err) {
+                statusText.innerText = "運算超時或顯存溢出，請縮短長度";
+            } finally {
+                isGenerating = false;
+                genBtn.innerText = "開始專業生成";
+                genBtn.style.opacity = "1";
             }
-
-            const wavBlob = makeWav(audioData, output.sampling_rate);
-            const url = window.URL.createObjectURL(wavBlob);
-            
-            document.getElementById('player').src = url;
-            document.getElementById('downloadBtn').onclick = () => {
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `Private_Music_${Date.now()}.wav`;
-                a.click();
-            };
-            
-            document.getElementById('downloadBtn').style.display = 'block';
-            updateStatus(`完成！耗時: ${((endTime - startTime)/1000).toFixed(1)}s`, "#00ffcc");
-            isProcessing = false;
         }
 
-        function updateStatus(msg, color) {
-            const s = document.getElementById('status');
-            s.innerText = msg;
-            s.style.color = color;
-        }
-
+        // WAV 封裝
         function makeWav(samples, sampleRate) {
             const buffer = new ArrayBuffer(44 + samples.length * 2);
             const view = new DataView(buffer);
@@ -86,7 +107,10 @@
             view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * 2, true);
             view.setUint16(32, 2, true); view.setUint16(34, 16, true);
             writeString(36, 'data'); view.setUint32(40, samples.length * 2, true);
-            for (let i=0; i<samples.length; i++) view.setInt16(44 + i*2, samples[i] * 32767, true);
+            for (let i=0; i<samples.length; i++) {
+                let s = Math.max(-1, Math.min(1, samples[i]));
+                view.setInt16(44 + i*2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+            }
             return new Blob([view], {type: 'audio/wav'});
         }
 
@@ -94,58 +118,104 @@
         window.generate = generate;
     </script>
     <style>
-        :root { --main: #00ffcc; --bg: #0a0a0c; }
-        body { background: var(--bg); color: #fff; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .studio-card { width: 450px; background: #16161a; padding: 30px; border-radius: 25px; border: 1px solid #333; box-shadow: 0 20px 80px rgba(0,0,0,0.7); }
-        h2 { font-weight: 800; color: var(--main); text-align: center; letter-spacing: 1px; }
-        .form-item { margin-bottom: 18px; }
-        label { font-size: 12px; color: #888; text-transform: uppercase; margin-bottom: 5px; display: block; }
-        textarea, select, input { width: 100%; background: #222; border: 1px solid #333; border-radius: 10px; color: #fff; padding: 12px; box-sizing: border-box; }
+        :root { --neon: #00ffcc; --bg: #08080a; --card: #121216; }
+        body { background: var(--bg); color: #fff; font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* 側邊控制欄 */
+        .sidebar { width: 380px; background: var(--card); border-right: 1px solid #222; padding: 30px; display: flex; flex-direction: column; overflow-y: auto; }
+        .main-view { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; background: radial-gradient(circle at center, #1a1a2e 0%, #08080a 100%); position: relative; }
+        
+        h1 { font-size: 24px; font-weight: 900; color: var(--neon); margin-bottom: 5px; text-transform: uppercase; }
+        .version { font-size: 10px; color: #555; margin-bottom: 30px; letter-spacing: 2px; }
+
+        .control-group { margin-bottom: 20px; }
+        label { font-size: 11px; color: #777; font-weight: bold; display: block; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+        
+        textarea, select, input { width: 100%; background: #1c1c22; border: 1px solid #333; border-radius: 8px; color: #fff; padding: 12px; font-size: 14px; box-sizing: border-box; outline: none; transition: 0.3s; }
+        textarea:focus, select:focus { border-color: var(--neon); box-shadow: 0 0 10px rgba(0,255,204,0.2); }
+        
         .row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        button { width: 100%; padding: 15px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        #genBtn { background: var(--main); color: #000; margin-top: 10px; }
-        #genBtn:hover { box-shadow: 0 0 20px rgba(0,255,204,0.4); }
-        #downloadBtn { background: transparent; border: 1px solid var(--main); color: var(--main); margin-top: 10px; display: none; }
-        #status { font-size: 11px; text-align: center; margin: 15px 0; font-family: monospace; }
-        audio { width: 100%; margin-top: 20px; border-radius: 30px; }
+        
+        button { width: 100%; padding: 16px; border-radius: 12px; border: none; font-weight: 800; font-size: 15px; cursor: pointer; transition: 0.3s; margin-top: 10px; }
+        #genBtn { background: var(--neon); color: #000; box-shadow: 0 4px 20px rgba(0,255,204,0.3); }
+        #genBtn:hover { transform: translateY(-2px); box-shadow: 0 6px 25px rgba(0,255,204,0.5); }
+        #genBtn:disabled { background: #333; color: #666; box-shadow: none; cursor: not-allowed; }
+        
+        #downloadBtn { background: transparent; border: 1.5px solid var(--neon); color: var(--neon); display: none; }
+        #downloadBtn:hover { background: var(--neon); color: #000; }
+
+        /* 狀態顯示 */
+        #status-area { margin-top: auto; padding-top: 20px; }
+        #status-text { font-size: 12px; color: #888; margin-bottom: 8px; }
+        .progress-bar { width: 100%; height: 4px; background: #222; border-radius: 2px; overflow: hidden; }
+        #load-progress { width: 0%; height: 100%; background: var(--neon); transition: 0.5s; }
+
+        /* 音樂播放器樣式 */
+        audio { margin-top: 30px; width: 400px; height: 40px; filter: invert(1) hue-rotate(180deg); display: none; }
+        .visualizer { width: 300px; height: 100px; border-bottom: 2px solid var(--neon); display: flex; align-items: flex-end; gap: 3px; margin-bottom: 20px; }
+        .bar { flex: 1; background: var(--neon); height: 10%; opacity: 0.3; }
     </style>
 </head>
 <body onload="init()">
-    <div class="studio-card">
-        <h2>AUDIO PRO STUDIO</h2>
-        
-        <div class="form-item">
-            <label>基礎風格 (Base Style)</label>
+
+    <div class="sidebar">
+        <h1>PRO AUDIO STUDIO</h1>
+        <div class="version">BUILD 2026.02 | NO-TRACE MODE</div>
+
+        <div class="control-group">
+            <label>音樂風格預設 (Presets)</label>
             <select id="style">
-                <option value="80s Japanese City Pop, analog warmth">City Pop (城市流行)</option>
-                <option value="Cyberpunk industrial techno, gritty texture">Cyberpunk (賽博龐克)</option>
-                <option value="Lo-fi hip hop, vinyl crackle, chill vibes">Lo-fi (放鬆嘻哈)</option>
-                <option value="Cinematic orchestral, dramatic, high dynamic">Epic (史詩交響)</option>
-                <option value="Modern K-Pop, clean production, energetic">K-Pop (現代流行)</option>
+                <option value="Lo-fi hip hop, vinyl crackle, cozy, chill">放鬆 Lo-fi (黑膠質感)</option>
+                <option value="80s Synthwave, retro future, neon lights, analog">復古電子 (賽博質感)</option>
+                <option value="Cinematic orchestral, epic, strings, Hans Zimmer style">史詩交響 (好萊塢風格)</option>
+                <option value="Modern K-Pop, high energy, crisp production">現代流行 (K-Pop 節奏)</option>
+                <option value="Jazz lounge, smooth saxophone, coffee shop">爵士酒廊 (薩克斯風)</option>
+                <option value="Techno dark club, heavy bass, industrial">工業硬核 (Techno)</option>
             </select>
         </div>
 
-        <div class="form-item">
-            <label>細節描述 (Prompt)</label>
-            <textarea id="prompt" placeholder="例如：帶有憂鬱感的鋼琴，雨聲背景..."></textarea>
+        <div class="control-group">
+            <label>客製化描述 (Prompt)</label>
+            <textarea id="prompt" placeholder="輸入旋律細節，例如：憂鬱的鋼琴、清脆的雨聲..."></textarea>
         </div>
 
         <div class="row">
-            <div class="form-item">
-                <label>生成長度 (秒)</label>
-                <input type="number" id="duration" value="10" min="2" max="30">
+            <div class="control-group">
+                <label>長度 (秒)</label>
+                <input type="number" id="duration" value="10" min="2" max="20">
             </div>
-            <div class="form-item">
-                <label>提示詞權重 (Guidance)</label>
+            <div class="control-group">
+                <label>提示詞權重</label>
                 <input type="number" id="guidance" value="3.5" step="0.5">
             </div>
         </div>
 
-        <button id="genBtn" disabled onclick="generate()">生成專業級音訊</button>
-        <div id="status">正在加載驅動模組...</div>
-        
-        <audio id="player" controls></audio>
+        <div class="control-group">
+            <label>生成溫度 (隨機性 0.1 - 1.5)</label>
+            <input type="range" id="temp" min="0.1" max="1.5" step="0.1" value="1.1">
+        </div>
+
+        <button id="genBtn" disabled onclick="generate()">開始專業生成</button>
         <button id="downloadBtn">下載無浮水印 WAV</button>
+
+        <div id="status-area">
+            <div id="status-text">初始化系統中...</div>
+            <div class="progress-bar"><div id="load-progress"></div></div>
+        </div>
     </div>
+
+    <div class="main-view">
+        <div class="visualizer">
+            <div class="bar" style="height: 40%"></div><div class="bar" style="height: 70%"></div><div class="bar" style="height: 50%"></div>
+            <div class="bar" style="height: 90%"></div><div class="bar" style="height: 30%"></div><div class="bar" style="height: 60%"></div>
+        </div>
+        <div style="text-align: center;">
+            <p style="font-size: 14px; color: #555; max-width: 400px;">
+                本工作站採用本地 WebGPU 指令集進行 PCM 運算，生成的音訊不包含任何數位指紋數據，且已自動通過擬人化濾鏡混淆。
+            </p>
+        </div>
+        <audio id="player" controls></audio>
+    </div>
+
 </body>
 </html>
