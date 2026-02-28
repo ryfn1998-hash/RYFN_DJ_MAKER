@@ -2,227 +2,82 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>RYFN DJ Maker | 專業音樂製作整合系統</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+    <title>WebGPU 私人無浮水印音樂工廠 2026</title>
+    <script type="module">
+        // 導入 2026 年最新的 Transformers.js，支援 WebGPU 直接運算
+        import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
+
+        let synthesizer;
+
+        // 1. 初始化模型 (直接下載到瀏覽器快取)
+        async function init() {
+            document.getElementById('status').innerText = "正在初始化 WebGPU 引擎...";
+            synthesizer = await pipeline('text-to-audio', 'Xenova/musicgen-small', {
+                device: 'webgpu', // 強制使用顯卡，速度極快且無雲端追蹤
+            });
+            document.getElementById('status').innerText = "✅ 引擎就緒 (無浮水印模式)";
+            document.getElementById('genBtn').disabled = false;
+        }
+
+        // 2. 生成與擬人化處理
+        async function generate() {
+            const prompt = document.getElementById('prompt').value;
+            document.getElementById('status').innerText = "正在進行本地張量運算 (Raw PCM)...";
+            
+            // 生成原始音訊
+            const output = await synthesizer(prompt, {
+                max_new_tokens: 256, // 約 5-10 秒，可調大
+                do_sample: true,
+                temperature: 1.3,    // 提高隨機性，減少 AI 味
+            });
+
+            // 3. 擬人化：手動注入微小隨機噪音 (Bypass 偵測器)
+            const audioData = output.audio;
+            for (let i = 0; i < audioData.length; i++) {
+                audioData[i] += (Math.random() - 0.5) * 0.001; // 注入 -60dB 底噪
+            }
+
+            // 導出為 WAV
+            const blob = window.URL.createObjectURL(makeWav(audioData, output.sampling_rate));
+            document.getElementById('player').src = blob;
+            document.getElementById('status').innerText = "✨ 生成完畢！已通過擬人化混淆。";
+        }
+
+        // 簡易 WAV 封裝函式 (確保格式純淨)
+        function makeWav(samples, sampleRate) {
+            const buffer = new ArrayBuffer(44 + samples.length * 2);
+            const view = new DataView(buffer);
+            const writeString = (off, s) => { for (let i=0; i<s.length; i++) view.setUint8(off+i, s.charCodeAt(i)); };
+            writeString(0, 'RIFF'); view.setUint32(4, 32 + samples.length * 2, true);
+            writeString(8, 'WAVE'); writeString(12, 'fmt '); view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+            view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+            writeString(36, 'data'); view.setUint32(40, samples.length * 2, true);
+            for (let i=0; i<samples.length; i++) view.setInt16(44 + i*2, samples[i] * 32767, true);
+            return new Blob([view], {type: 'audio/wav'});
+        }
+
+        window.init = init;
+        window.generate = generate;
+    </script>
     <style>
-        :root { --neon: #00f2ff; --magenta: #ff00ff; --panel: #121214; --bg: #050505; --gold: #ffd700; }
-        body, html { margin: 0; padding: 0; height: 100%; background: var(--bg); color: #fff; font-family: 'Noto Sans TC', sans-serif; overflow: hidden; }
-
-        /* 頂部狀態欄 (仿 djay) */
-        .top-bar { height: 60px; background: #000; border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; z-index: 100; }
-        .logo { font-family: 'Orbitron'; font-size: 20px; color: var(--neon); letter-spacing: 2px; }
-
-        /* 側邊導航系統 */
-        #sidebar { position: fixed; left: -300px; top: 0; width: 300px; height: 100%; background: var(--panel); border-right: 2px solid var(--neon); transition: 0.4s; z-index: 2000; display: flex; flex-direction: column; }
-        #sidebar.open { left: 0; }
-        .menu-icon { cursor: pointer; color: var(--neon); font-size: 24px; padding: 15px; }
-
-        /* 主工作區 */
-        .workspace { height: calc(100vh - 60px); width: 100%; display: none; padding: 20px; box-sizing: border-box; }
-        .workspace.active { display: block; }
-
-        /* --- DJ 旗艦模組 --- */
-        .dj-engine { display: grid; grid-template-columns: 1fr 220px 1fr; gap: 20px; height: 100%; }
-        .deck { background: #1a1a1c; border-radius: 15px; border: 1px solid #333; padding: 25px; position: relative; display: flex; flex-direction: column; align-items: center; }
-        .vinyl-record { width: 300px; height: 300px; border-radius: 50%; background: radial-gradient(circle, #222 2%, #000 100%); border: 12px solid #1a1a1a; box-shadow: 0 0 30px rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; position: relative; }
-        .vinyl-record::after { content: ""; position: absolute; width: 100%; height: 100%; border-radius: 50%; background: repeating-radial-gradient(circle, transparent 0, transparent 2px, rgba(255,255,255,0.03) 3px); }
-        .spinning { animation: rotate 1.8s linear infinite; }
-        @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
-        /* 專業混音通道條 */
-        .channel-strip { display: flex; gap: 15px; margin-top: 30px; background: #000; padding: 20px; border-radius: 12px; }
-        .fader-unit { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-        .fader-unit span { font-size: 11px; color: #777; font-weight: bold; }
-        input[type="range"][orient="vertical"] { appearance: slider-vertical; width: 10px; height: 160px; }
-
-        /* --- Synth One 擬真模組 --- */
-        .synth-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; background: #1c1c1e; padding: 20px; border: 2px solid #333; border-radius: 5px; }
-        .module { background: #111; border: 1px solid #444; padding: 15px; border-top: 4px solid var(--gold); }
-        .module h4 { margin: 0 0 10px 0; font-size: 12px; color: var(--gold); text-transform: uppercase; }
-
-        /* 鋼琴鍵盤 (實體對映) */
-        .piano-wrapper { display: flex; justify-content: center; height: 240px; margin-top: 40px; position: relative; background: #000; padding: 10px; border-radius: 10px; }
-        .white-key { width: 45px; height: 100%; background: #fff; border: 1px solid #bbb; border-radius: 0 0 4px 4px; cursor: pointer; z-index: 1; transition: 0.1s; }
-        .black-key { width: 32px; height: 65%; background: #222; border: 1px solid #444; margin: 0 -16px; z-index: 2; cursor: pointer; }
-        .white-key:active, .black-key:active { background: var(--neon); }
-
-        /* 8x8 方格 Launchpad */
-        .pad-container { display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; max-width: 700px; margin: 0 auto; }
-        .pad-cell { aspect-ratio: 1; background: #1a1a1f; border-radius: 4px; border-bottom: 5px solid #000; cursor: pointer; }
-        .pad-cell:active { transform: translateY(3px); border-bottom-width: 1px; background: var(--magenta); box-shadow: 0 0 20px var(--magenta); }
-
-        .btn-pro { padding: 12px 25px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; font-family: 'Orbitron'; }
+        body { background: #050505; color: #00ffcc; font-family: sans-serif; display: flex; justify-content: center; padding: 50px; }
+        .box { background: #111; padding: 30px; border-radius: 20px; border: 1px solid #00ffcc; width: 400px; box-shadow: 0 0 20px #00ffcc44; }
+        textarea { width: 100%; background: #222; border: none; color: white; padding: 10px; border-radius: 10px; margin: 10px 0; }
+        button { width: 100%; padding: 15px; background: #00ffcc; color: black; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        button:disabled { background: #333; color: #666; }
+        #status { font-size: 12px; margin: 10px 0; color: #888; text-align: center; }
     </style>
 </head>
-<body>
-
-    <div class="top-bar">
-        <div class="menu-icon" onclick="toggleSidebar()">☰</div>
-        <div class="logo">RYFN TITAN PRO</div>
-        <div style="color:var(--gold); font-family:'Orbitron';">BPM: 128</div>
+<body onload="init()">
+    <div class="box">
+        <h3>Private Music Gen (Offline)</h3>
+        <p style="font-size: 11px;">⚠️ 首次開啟需下載約 500MB 模型數據</p>
+        <textarea id="prompt" placeholder="例如：Lo-fi hip hop, smooth saxophone, raining background..."></textarea>
+        <button id="genBtn" disabled onclick="generate()">開始無浮水印生成</button>
+        <div id="status">正在加載 WebGPU 核心...</div>
+        <audio id="player" controls style="width: 100%; margin-top: 20px;"></audio>
     </div>
-
-    <nav id="sidebar">
-        <div style="padding: 40px 30px; border-bottom: 1px solid #333;"><h2 style="color:var(--neon); margin:0;">選單</h2></div>
-        <div class="nav-item" onclick="showTab('dj-tab')" style="padding:20px; cursor:pointer;">🎧 旗艦雙軌混音 (Mixer)</div>
-        <div class="nav-item" onclick="showTab('pad-tab')" style="padding:20px; cursor:pointer;">🔳 8x8 專業採樣 (Sampler)</div>
-        <div class="nav-item" onclick="showTab('synth-tab')" style="padding:20px; cursor:pointer;">🎹 Synth One 核心 (VST)</div>
-        <div class="nav-item" onclick="showTab('help-tab')" style="padding:20px; cursor:pointer; margin-top:auto; background:#1a1a1c;">❓ 繁體中文說明書</div>
-    </nav>
-
-    <div id="dj-tab" class="workspace active">
-        <div class="dj-engine">
-            <div class="deck">
-                <div class="vinyl-record" id="v-a"><div style="width:100px; height:100px; background:var(--neon); border-radius:50%; display:flex; align-items:center; justify-content:center; color:#000; font-weight:bold;">DECK A</div></div>
-                <input type="file" id="load-a" style="margin-top:15px; font-size:12px;">
-                <div class="channel-strip">
-                    <div class="fader-unit"><input type="range" orient="vertical" min="-40" max="10" value="0" oninput="deckA.eq.low.value=this.value"><span>低音</span></div>
-                    <div class="fader-unit"><input type="range" orient="vertical" min="-40" max="10" value="0" oninput="deckA.eq.mid.value=this.value"><span>中音</span></div>
-                    <div class="fader-unit"><input type="range" orient="vertical" min="-40" max="10" value="0" oninput="deckA.eq.high.value=this.value"><span>高音</span></div>
-                    <div class="fader-unit"><input type="range" orient="vertical" min="0" max="100" value="100" oninput="deckA.filter.frequency.value=this.value*150"><span>濾波</span></div>
-                    <div class="fader-unit" style="border-left:1px solid #333; padding-left:10px;"><input type="range" orient="vertical" min="-60" max="10" value="0" oninput="deckA.vol.volume.value=this.value"><span>音量</span></div>
-                </div>
-                <button class="btn-pro" onclick="controlDeck('a')" style="background:var(--neon); width:100%; margin-top:15px;">PLAY / STOP</button>
-            </div>
-
-            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center;">
-                <h4 style="color:var(--gold)">MASTER</h4>
-                <input type="range" orient="vertical" style="height:250px;" oninput="Tone.Destination.volume.value = this.value">
-                <div style="height:40px;"></div>
-                <input type="range" min="0" max="1" step="0.01" style="width:180px;" oninput="crossfade.fade.value = this.value">
-                <span style="font-size:12px; margin-top:5px;">CROSSFADER</span>
-            </div>
-
-            <div class="deck">
-                <div class="vinyl-record" id="v-b"><div style="width:100px; height:100px; background:var(--magenta); border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:bold;">DECK B</div></div>
-                <input type="file" id="load-b" style="margin-top:15px; font-size:12px;">
-                <div class="channel-strip">
-                    <div class="fader-unit" style="border-right:1px solid #333; padding-right:10px;"><input type="range" orient="vertical" min="-60" max="10" value="0" oninput="deckB.vol.volume.value=this.value"><span>音量</span></div>
-                    <div class="fader-unit"><input type="range" orient="vertical" min="-40" max="10" value="0" oninput="deckB.eq.low.value=this.value"><span>低音</span></div>
-                    <div class="fader-unit"><input type="range" orient="vertical" min="-40" max="10" value="0" oninput="deckB.eq.mid.value=this.value"><span>中音</span></div>
-                    <div class="fader-unit"><input type="range" orient="vertical" min="-40" max="10" value="0" oninput="deckB.eq.high.value=this.value"><span>高音</span></div>
-                    <div class="fader-unit"><input type="range" orient="vertical" min="0" max="100" value="100" oninput="deckB.filter.frequency.value=this.value*150"><span>濾波</span></div>
-                </div>
-                <button class="btn-pro" onclick="controlDeck('b')" style="background:var(--magenta); color:#fff; width:100%; margin-top:15px;">PLAY / STOP</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="pad-tab" class="workspace">
-        <div style="text-align:center; margin-bottom:20px;">
-            <h2 style="color:var(--magenta)">專業 8x8 音效觸發器</h2>
-            <select id="kit" style="background:#000; color:var(--neon); padding:10px; border:1px solid var(--neon);">
-                <option>EDM 音色包 V1</option>
-                <option>Hip-Hop 鼓組</option>
-                <option>Future Bass 採樣</option>
-            </select>
-        </div>
-        <div class="pad-container" id="pad-matrix"></div>
-    </div>
-
-    <div id="synth-tab" class="workspace">
-        <div class="synth-grid">
-            <div class="module"><h4>OSC 1 (振盪器)</h4><div style="font-size:10px;">波形：鋸齒波</div></div>
-            <div class="module"><h4>FILTER (濾波器)</h4><div style="font-size:10px;">切波：1200Hz / 共振：Q 1.5</div></div>
-            <div class="module"><h4>ADSR (包絡線)</h4><div style="font-size:10px;">起音：5ms / 衰減：200ms</div></div>
-            <div class="module"><h4>LFO (調變)</h4><div style="font-size:10px;">頻率：0.5Hz</div></div>
-        </div>
-        <div class="piano-wrapper" id="piano"></div>
-    </div>
-
-    <div id="help-tab" class="workspace">
-        <div style="max-width:800px; margin:0 auto; background:var(--panel); padding:40px; border-radius:15px; border-left:5px solid var(--neon);">
-            <h1 style="color:var(--neon)">RYFN PRO 使用指南 (繁體中文)</h1>
-            <hr border="0" style="border-top:1px solid #333; margin:20px 0;">
-            <h3>1. 如何載入音樂？</h3>
-            <p>在 DJ 混音分頁中，點擊<strong>「選擇檔案」</strong>。系統會立即解碼音訊。解碼完成後，按下底部的 <strong>PLAY</strong> 鍵。請確保在按下播放前，音軌已完全加載。</p>
-            <h3>2. 專業混音邏輯</h3>
-            <p>每個軌道都擁有獨立的 <strong>EQ3 (低/中/高音)</strong>。你可以透過垂直推子精確控制頻率衰減。中間的橫向推子 (Crossfader) 用於過渡 A 軌與 B 軌。</p>
-            <h3>3. 合成器與採樣器</h3>
-            <p>合成器支援<strong>複音 (Polyphonic)</strong>，你可以同時彈奏多個鋼琴鍵。採樣器 (8x8) 會在觸發時發出強烈的視覺反饋，並支援即時點擊。</p>
-            <p style="margin-top:40px; color:#666;">© 2026 RYFN Team. 專為高效能音樂製作而生。</p>
-        </div>
-    </div>
-
-    <script>
-        // --- 核心音訊拓撲 ---
-        const crossfade = new Tone.CrossFade(0.5).toDestination();
-        const mainLimiter = new Tone.Limiter(-1).toDestination();
-
-        function createDeckChain(bus) {
-            const player = new Tone.Player({ loop: true, autostart: false });
-            const eq = new Tone.EQ3(0, 0, 0);
-            const filter = new Tone.Filter(20000, "lowpass");
-            const vol = new Tone.Volume(0);
-            player.chain(eq, filter, vol, bus);
-            return { player, eq, filter, vol };
-        }
-
-        const deckA = createDeckChain(crossfade.a);
-        const deckB = createDeckChain(crossfade.b);
-        const synth = new Tone.PolySynth(Tone.Synth).toDestination();
-
-        // --- 介面邏輯 ---
-        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
-        function showTab(id) {
-            document.querySelectorAll('.workspace').forEach(w => w.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-            toggleSidebar();
-        }
-
-        // --- 音軌載入實作 (修正原本無法播放的問題) ---
-        async function setupLoader(inputId, deck) {
-            document.getElementById(inputId).onchange = async (e) => {
-                const file = e.target.files[0];
-                const url = URL.createObjectURL(file);
-                await deck.player.load(url);
-                console.log(`${inputId} 加載成功`);
-                alert("音軌已就緒，請按下 PLAY 開始。");
-            };
-        }
-        setupLoader('load-a', deckA);
-        setupLoader('load-b', deckB);
-
-        function controlDeck(id) {
-            const target = id === 'a' ? deckA.player : deckB.player;
-            const vinyl = document.getElementById(`v-${id}`);
-            if(target.state === 'started') {
-                target.stop();
-                vinyl.classList.remove('spinning');
-            } else {
-                if(target.loaded) {
-                    Tone.start();
-                    target.start();
-                    vinyl.classList.add('spinning');
-                } else alert("請先選擇音樂檔案並等待載入！");
-            }
-        }
-
-        // --- 生成 8x8 矩陣 ---
-        const matrix = document.getElementById('pad-matrix');
-        for(let i=0; i<64; i++) {
-            const p = document.createElement('div');
-            p.className = 'pad-cell';
-            p.onclick = () => {
-                Tone.start();
-                synth.triggerAttackRelease("G2", "16n");
-            };
-            matrix.appendChild(p);
-        }
-
-        // --- 生成鋼琴 (對應 MIDI 邏輯) ---
-        const piano = document.getElementById('piano');
-        const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-        for(let oct=3; oct<=4; oct++) {
-            notes.forEach(n => {
-                const k = document.createElement('div');
-                k.className = n.includes('#') ? 'black-key' : 'white-key';
-                k.onmousedown = () => { Tone.start(); synth.triggerAttack(`${n}${oct}`); };
-                k.onmouseup = () => synth.triggerRelease(`${n}${oct}`);
-                piano.appendChild(k);
-            });
-        }
-    </script>
 </body>
 </html>
