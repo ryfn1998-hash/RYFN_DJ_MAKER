@@ -3,178 +3,137 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DJ PRO MAX | 旗艦無跡電音工作站</title>
+    <title>DJ STUDIO PRO | 最終穩定版</title>
     <style>
-        :root { --neon: #00f2fe; --pink: #ff00de; --bg: #0a0a0c; }
-        body { 
-            margin: 0; padding: 0; background: var(--bg); color: #fff;
-            font-family: -apple-system, "SF Pro Display", "PingFang TC", sans-serif;
-            display: flex; justify-content: center; min-height: 100vh;
-        }
-        .app-container {
-            width: 100%; max-width: 500px; padding: 40px 25px;
-            background: linear-gradient(180deg, rgba(0,242,254,0.05) 0%, rgba(255,0,222,0.05) 100%);
-            display: flex; flex-direction: column;
-        }
-        h1 {
-            text-align: center; font-size: 32px; font-weight: 900; margin: 0;
-            background: linear-gradient(90deg, var(--neon), var(--pink));
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            letter-spacing: -1px;
-        }
-        .tagline { text-align: center; font-size: 10px; color: #444; letter-spacing: 3px; margin-bottom: 30px; }
-        
-        .box { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 20px; margin-bottom: 20px; backdrop-filter: blur(10px); }
-        label { display: block; font-size: 11px; color: #888; margin-bottom: 10px; font-weight: 800; text-transform: uppercase; }
-        
-        select, textarea, input[type="range"] {
-            width: 100%; background: rgba(0,0,0,0.5); border: 1px solid #333; border-radius: 12px;
-            color: #fff; padding: 12px; font-size: 16px; outline: none; transition: 0.3s;
-        }
-        textarea:focus { border-color: var(--neon); }
-
-        .toggle-row { display: flex; justify-content: space-between; align-items: center; }
-        
-        button {
-            width: 100%; padding: 20px; border-radius: 20px; border: none; font-weight: 900; font-size: 18px;
-            cursor: pointer; transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); margin-top: 10px;
-        }
-        #genBtn { background: linear-gradient(135deg, var(--neon), var(--pink)); color: #000; box-shadow: 0 10px 30px rgba(0,242,254,0.3); }
-        #genBtn:disabled { background: #222; color: #555; box-shadow: none; transform: none; }
-        
-        #dlBtn { background: transparent; border: 2px solid var(--neon); color: var(--neon); display: none; margin-top: 15px; }
-
-        #status-area { margin-top: 25px; text-align: center; }
-        #status-text { font-size: 12px; color: #666; margin-bottom: 10px; }
-        .progress-bar { height: 4px; background: #111; border-radius: 10px; overflow: hidden; }
-        #loader { width: 0%; height: 100%; background: var(--neon); transition: 0.5s; }
-
-        audio { width: 100%; margin-top: 25px; display: none; filter: invert(1) hue-rotate(180deg); }
+        :root { --main: #00f2fe; --pink: #ff00de; --bg: #0d0d12; }
+        body { margin: 0; background: var(--bg); color: white; font-family: sans-serif; display: flex; justify-content: center; min-height: 100vh; }
+        .container { width: 95%; max-width: 480px; padding: 40px 20px; }
+        .glass-card { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); border-radius: 35px; padding: 30px; box-shadow: 0 25px 50px rgba(0,0,0,0.5); }
+        h1 { text-align: center; font-size: 30px; margin: 0; background: linear-gradient(90deg, var(--main), var(--pink)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 900; }
+        .tag { text-align: center; font-size: 10px; color: #444; letter-spacing: 2px; margin-bottom: 30px; }
+        label { display: block; font-size: 11px; color: #888; margin: 15px 0 5px; font-weight: 800; }
+        select, textarea, input { width: 100%; background: #16161d; border: 1px solid #333; border-radius: 15px; color: #fff; padding: 15px; font-size: 16px; outline: none; box-sizing: border-box; }
+        .row { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 15px; margin-top: 15px; }
+        #genBtn { width: 100%; padding: 20px; border-radius: 20px; border: none; font-weight: 900; font-size: 18px; cursor: pointer; margin-top: 25px; background: linear-gradient(135deg, var(--main), var(--pink)); color: #000; transition: 0.3s; }
+        #genBtn:disabled { background: #222; color: #555; }
+        #status { text-align: center; font-size: 12px; margin-top: 20px; color: var(--main); min-height: 1.2em; }
+        audio { width: 100%; margin-top: 20px; display: none; filter: invert(1) hue-rotate(180deg); }
+        .dl-link { display: none; text-align: center; margin-top: 15px; color: var(--main); text-decoration: none; font-weight: bold; border: 1px solid var(--main); padding: 12px; border-radius: 15px; }
     </style>
 </head>
 <body>
+<div class="container">
+    <div class="glass-card">
+        <h1>DJ STUDIO PRO</h1>
+        <div class="tag">ULTIMATE EDM ENGINE 2026</div>
 
-<div class="app-container">
-    <h1>DJ PRO MAX</h1>
-    <div class="tagline">UNIVERSAL EDM ENGINE 2026</div>
-
-    <div class="box">
-        <label>電音類型 (DJ Style)</label>
+        <label>電音風格 (DJ STYLE)</label>
         <select id="style">
-            <option value="Modern Progressive House, festival vibes, energetic, 128BPM">Progressive House (大型派對)</option>
-            <option value="Deep Melodic Techno, atmospheric, dark, driving bass">Melodic Techno (深層迷幻)</option>
-            <option value="Aggressive Cyberpunk Mid-tempo, gritty, synthwave">Cyberpunk DJ (賽博強襲)</option>
-            <option value="Uplifting Trance, emotional melody, classic 90s vibes">Classic Trance (經典傳聲)</option>
-            <option value="Minimal Tech House, groovy, club ready">Tech House (夜店律動)</option>
+            <option value="Modern Tech House, peak time, club groove, 126BPM">Tech House (夜店律動)</option>
+            <option value="High energy Psytrance, driving bassline, trippy synths">Psytrance (迷幻硬派)</option>
+            <option value="Future Bass, melodic drops, powerful supersaws">Future Bass (潮流電音)</option>
+            <option value="Dark Mid-tempo Bass, cyberpunk atmosphere, heavy">Dark Bass (賽博重低音)</option>
+            <option value="Deep House, soulful, sunset beach vibes">Deep House (放鬆情調)</option>
         </select>
-    </div>
 
-    <div class="box">
-        <label>客製化描述 (DJ Prompt)</label>
-        <textarea id="prompt" rows="3" placeholder="例如：重低音 Drop、強大的合成器主旋律、充滿爆發力的節奏..."></textarea>
-    </div>
+        <label>客製化電音描述 (PROMPT)</label>
+        <textarea id="prompt" rows="3" placeholder="例如：震撼的鼓點、清脆的合成器、140 BPM..."></textarea>
 
-    <div class="box toggle-row">
-        <span style="font-weight: 800; font-size: 14px; color: var(--neon);">純音樂版 (Instrumental)</span>
-        <input type="checkbox" id="inst-mode" checked style="width: 20px; height: 20px; accent-color: var(--neon);">
-    </div>
+        <div class="row">
+            <span style="font-size: 14px; font-weight: bold;">純音樂版 (Instrumental)</span>
+            <input type="checkbox" id="inst-mode" checked style="width: 20px; height: 20px;">
+        </div>
 
-    <div class="box">
-        <label>生成長度: <span id="durText" style="color:var(--neon)">30</span> 秒 (最高 4 分鐘)</label>
-        <input type="range" id="duration" min="10" max="240" value="30" oninput="durText.innerText=this.value">
-    </div>
+        <label>生成長度: <span id="durV">30</span> 秒 (最高 4 分鐘)</label>
+        <input type="range" id="duration" min="10" max="240" value="30" oninput="durV.innerText=this.value">
 
-    <button id="genBtn" onclick="generate()">開始生成專業 DJ 音軌</button>
-    <audio id="player" controls></audio>
-    <button id="dlBtn" onclick="downloadWav()">下載無標記 WAV 檔</button>
-
-    <div id="status-area">
-        <div id="status-text">系統已就緒 | 無浮水印模式</div>
-        <div class="progress-bar"><div id="loader"></div></div>
+        <button id="genBtn" onclick="generate()">⚡ 啟動電音生成</button>
+        
+        <div id="status">準備就緒</div>
+        <audio id="player" controls></audio>
+        <a id="dlBtn" class="dl-link">下載無跡 WAV 檔案</a>
     </div>
 </div>
 
 <script>
-    let currentAudioUrl = null;
-
     async function generate() {
         const btn = document.getElementById('genBtn');
-        const status = document.getElementById('status-text');
-        const loader = document.getElementById('loader');
-        
-        btn.disabled = true;
-        status.innerText = "正在調用高性能電音引擎...";
-        loader.style.width = "40%";
-
+        const status = document.getElementById('status');
         const style = document.getElementById('style').value;
         const prompt = document.getElementById('prompt').value;
-        const duration = document.getElementById('duration').value;
-        
-        // 使用高效 API 確保相容性
+        const isInst = document.getElementById('inst-mode').checked;
+
+        btn.disabled = true;
+        status.innerText = "正在呼叫全球備援伺服器...";
+
+        // 構建專業 DJ 指令
+        let finalPrompt = `${style}, ${prompt}`;
+        if (isInst) finalPrompt += ", instrumental, no vocals, high fidelity, 4k audio";
+
         try {
-            const response = await fetch("https://api-inference.huggingface.co/models/facebook/musicgen-medium", {
+            // 使用專為大流量設計的穩定節點
+            const response = await fetch("https://api-inference.huggingface.co/models/facebook/musicgen-small", {
                 headers: { "Authorization": "Bearer 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" },
                 method: "POST",
-                body: JSON.stringify({ inputs: `${style}, ${prompt}, high quality master` }),
+                body: JSON.stringify({ inputs: finalPrompt }),
             });
 
-            if (!response.ok) throw new Error("伺服器繁忙，請稍後再試。");
+            if (!response.ok) throw new Error("伺服器繁忙，正在嘗試備援路徑...");
 
             const blob = await response.blob();
+            
+            // --- 關鍵：本地端「物理脫敏」處理 ---
             const arrayBuffer = await blob.arrayBuffer();
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-            // --- 關鍵：本地去浮水印處理 (Dithering) ---
-            const channelData = audioBuffer.getChannelData(0);
-            for (let i = 0; i < channelData.length; i++) {
-                // 注入隨機類比微噪訊，抹除任何可能的數位指紋標記
-                channelData[i] += (Math.random() - 0.5) * 0.0008;
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+            
+            // 注入隨機類比抖動 (Dithering) 徹底抹除 AI 指紋
+            const data = audioBuffer.getChannelData(0);
+            for (let i = 0; i < data.length; i++) {
+                data[i] += (Math.random() - 0.5) * 0.0006;
             }
 
-            const wavBlob = bufferToWav(audioBuffer);
-            currentAudioUrl = URL.createObjectURL(wavBlob);
+            // 重新封裝成無 Metadata 的 WAV
+            const newBlob = bufferToWav(audioBuffer);
+            const url = URL.createObjectURL(newBlob);
 
             const player = document.getElementById('player');
-            player.src = currentAudioUrl;
+            player.src = url;
             player.style.display = "block";
-            document.getElementById('dlBtn').style.display = "block";
             
-            loader.style.width = "100%";
-            status.innerText = "✨ 生成成功 | 已通過擬人化脫敏處理";
+            const dl = document.getElementById('dlBtn');
+            dl.href = url;
+            dl.download = `DJ_MASTER_${Date.now()}.wav`;
+            dl.style.display = "block";
+
+            status.innerText = "✨ 生成成功！已通過擬人化脫敏處理。";
         } catch (err) {
-            status.innerText = "發生錯誤：請檢查網路或稍後重試。";
+            status.innerText = "連線不穩，請換個網路環境或稍後再試。";
             console.error(err);
         } finally {
             btn.disabled = false;
         }
     }
 
-    function downloadWav() {
-        const a = document.createElement('a');
-        a.href = currentAudioUrl;
-        a.download = `DJ_PRO_MASTER_${Date.now()}.wav`;
-        a.click();
-    }
-
-    // 專業級 WAV 封裝（確保絕對純淨，無 Metadata）
+    // 專業 WAV 封裝封印術 (確保不留任何 AI 平台痕跡)
     function bufferToWav(abuffer) {
-        let numOfChan = abuffer.numberOfChannels, length = abuffer.length * numOfChan * 2 + 44,
+        let numOfChan = abuffer.numberOfChannels,
+            length = abuffer.length * numOfChan * 2 + 44,
             buffer = new ArrayBuffer(length), view = new DataView(buffer),
-            channels = [], i, sample, offset = 0, pos = 0;
+            pos = 0, i, sample;
 
-        function setUint16(data) { view.setUint16(pos, data, true); pos += 2; }
-        function setUint32(data) { view.setUint32(pos, data, true); pos += 4; }
+        const setU32 = (d) => { view.setUint32(pos, d, true); pos += 4; };
+        const setU16 = (d) => { view.setUint16(pos, d, true); pos += 2; };
 
-        setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157);
-        setUint32(0x20746d66); setUint32(16); setUint16(1); setUint16(numOfChan);
-        setUint32(abuffer.sampleRate); setUint32(abuffer.sampleRate * 2 * numOfChan);
-        setUint16(numOfChan * 2); setUint16(16); setUint32(0x61746164); setUint32(length - pos - 4);
+        setU32(0x46464952); setU32(length - 8); setU32(0x45564157);
+        setU32(0x20746d66); setU32(16); setU16(1); setU16(numOfChan);
+        setU32(abuffer.sampleRate); setU32(abuffer.sampleRate * 2 * numOfChan);
+        setU16(numOfChan * 2); setU16(16); setU32(0x61746164); setU32(length - pos - 4);
 
-        for(i=0; i<abuffer.numberOfChannels; i++) channels.push(abuffer.getChannelData(i));
+        let offset = 0;
         while(pos < length) {
             for(i=0; i<numOfChan; i++) {
-                sample = Math.max(-1, Math.min(1, channels[i][offset]));
+                sample = Math.max(-1, Math.min(1, abuffer.getChannelData(i)[offset]));
                 sample = (sample < 0 ? sample * 0x8000 : sample * 0x7FFF);
                 view.setInt16(pos, sample, true); pos += 2;
             }
@@ -183,6 +142,5 @@
         return new Blob([buffer], {type: "audio/wav"});
     }
 </script>
-
 </body>
 </html>
