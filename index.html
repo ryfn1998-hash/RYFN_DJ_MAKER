@@ -2,35 +2,30 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Audio Pro Max | 頂級私人音樂工作站</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ultimate AI Studio | 頂級私人音樂工作站</title>
     <script type="module">
         import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
 
         let synthesizer;
         let isGenerating = false;
 
-        // 初始化 WebGPU 引擎
+        // 初始化系統
         async function init() {
             const statusText = document.getElementById('status-text');
-            const progress = document.getElementById('load-progress');
-            
+            const loader = document.getElementById('loader');
             try {
-                statusText.innerText = "正在喚醒 WebGPU 核心模型 (約 1.2GB)...";
-                progress.style.width = "30%";
-                
+                statusText.innerText = "正在激活 WebGPU 核心 (iOS/Win/Mac)...";
+                // 使用中型模型以平衡 iPhone 效能與品質
                 synthesizer = await pipeline('text-to-audio', 'Xenova/musicgen-medium', {
                     device: 'webgpu',
-                    dtype: 'fp32'
                 });
-                
-                progress.style.width = "100%";
-                statusText.innerText = "✅ 系統就緒 | 無浮水印模式已啟動";
-                statusText.style.color = "#00ffcc";
+                statusText.innerText = "✅ 系統已就緒 | 無浮水印模式";
+                loader.style.width = "100%";
                 document.getElementById('genBtn').disabled = false;
             } catch (e) {
-                statusText.innerText = "錯誤：瀏覽器不支援 WebGPU 或顯存不足";
-                statusText.style.color = "#ff4444";
+                statusText.innerText = "錯誤：硬體不支援 WebGPU。請更新 iOS 或使用電腦 Chrome。";
+                console.error(e);
             }
         }
 
@@ -40,34 +35,35 @@
             
             const genBtn = document.getElementById('genBtn');
             const statusText = document.getElementById('status-text');
-            genBtn.innerText = "運算中 (Neural Processing)...";
-            genBtn.style.opacity = "0.6";
-
-            // 獲取設定值
             const prompt = document.getElementById('prompt').value;
             const style = document.getElementById('style').value;
+            const isInst = document.getElementById('inst-mode').checked;
             const duration = parseInt(document.getElementById('duration').value);
             const guidance = parseFloat(document.getElementById('guidance').value);
-            const temp = parseFloat(document.getElementById('temp').value);
+
+            genBtn.innerText = "正在編織音訊數據...";
+            genBtn.style.background = "linear-gradient(90deg, #555, #222)";
+
+            // 處理 Prompt 邏輯
+            let fullPrompt = `${style}, ${prompt}`;
+            if (isInst) fullPrompt += ", pure instrumental, no vocals, high fidelity";
             
-            const fullPrompt = `${style}, ${prompt}, high fidelity, masterpiece, studio grade`;
-            const maxTokens = duration * 50; 
+            // 2026 算法優化：50 tokens/sec
+            const maxTokens = duration * 50;
 
             try {
                 const output = await synthesizer(fullPrompt, {
                     max_new_tokens: maxTokens,
                     do_sample: true,
                     guidance_scale: guidance,
-                    temperature: temp
+                    temperature: 1.15
                 });
 
                 let audioData = output.audio;
 
-                // --- 擬人化去特徵處理 (Bypass AI Detection) ---
-                // 注入類比底噪與非線性擾動
+                // --- 擬人化混淆 (Bypass Detection) ---
                 for (let i = 0; i < audioData.length; i++) {
-                    // 加入極微小的隨機漂移，破壞 AI 的完美頻譜
-                    audioData[i] += (Math.random() - 0.5) * 0.0008; 
+                    audioData[i] += (Math.random() - 0.5) * 0.0007; // 注入類比底噪
                 }
 
                 const wavBlob = makeWav(audioData, output.sampling_rate);
@@ -77,26 +73,26 @@
                 player.src = url;
                 player.style.display = "block";
                 
-                const downloadBtn = document.getElementById('downloadBtn');
-                downloadBtn.style.display = "block";
-                downloadBtn.onclick = () => {
+                const dlBtn = document.getElementById('dlBtn');
+                dlBtn.style.display = "block";
+                dlBtn.onclick = () => {
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `Studio_Pro_${Date.now()}.wav`;
+                    a.download = `Private_Music_Pro_${Date.now()}.wav`;
                     a.click();
                 };
 
                 statusText.innerText = "✨ 生成成功 | 已通過擬人化濾鏡";
             } catch (err) {
-                statusText.innerText = "運算超時或顯存溢出，請縮短長度";
+                statusText.innerText = "設備顯存不足，請嘗試縮短長度。";
+                console.error(err);
             } finally {
                 isGenerating = false;
-                genBtn.innerText = "開始專業生成";
-                genBtn.style.opacity = "1";
+                genBtn.innerText = "開始生成專業音訊";
+                genBtn.style.background = "linear-gradient(135deg, #00f2fe 0%, #4facfe 100%)";
             }
         }
 
-        // WAV 封裝
         function makeWav(samples, sampleRate) {
             const buffer = new ArrayBuffer(44 + samples.length * 2);
             const view = new DataView(buffer);
@@ -118,104 +114,114 @@
         window.generate = generate;
     </script>
     <style>
-        :root { --neon: #00ffcc; --bg: #08080a; --card: #121216; }
-        body { background: var(--bg); color: #fff; font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
-        
-        /* 側邊控制欄 */
-        .sidebar { width: 380px; background: var(--card); border-right: 1px solid #222; padding: 30px; display: flex; flex-direction: column; overflow-y: auto; }
-        .main-view { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; background: radial-gradient(circle at center, #1a1a2e 0%, #08080a 100%); position: relative; }
-        
-        h1 { font-size: 24px; font-weight: 900; color: var(--neon); margin-bottom: 5px; text-transform: uppercase; }
-        .version { font-size: 10px; color: #555; margin-bottom: 30px; letter-spacing: 2px; }
+        :root {
+            --primary: #4facfe;
+            --secondary: #00f2fe;
+            --dark: #0f172a;
+            --glass: rgba(255, 255, 255, 0.05);
+        }
+        body {
+            margin: 0; padding: 0;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex; flex-direction: column; align-items: center; min-height: 100vh;
+        }
+        .app-container {
+            width: 95%; max-width: 500px; margin: 20px auto;
+            background: var(--glass); backdrop-filter: blur(20px);
+            border-radius: 30px; border: 1px solid rgba(255,255,255,0.1);
+            padding: 30px; box-sizing: border-box; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+        }
+        h1 {
+            text-align: center; font-size: 28px; font-weight: 800; margin-bottom: 5px;
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .tagline { text-align: center; font-size: 10px; color: #64748b; margin-bottom: 30px; letter-spacing: 2px; }
 
-        .control-group { margin-bottom: 20px; }
-        label { font-size: 11px; color: #777; font-weight: bold; display: block; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+        .group { margin-bottom: 20px; }
+        label { display: block; font-size: 12px; font-weight: 600; color: #94a3b8; margin-bottom: 8px; text-transform: uppercase; }
         
-        textarea, select, input { width: 100%; background: #1c1c22; border: 1px solid #333; border-radius: 8px; color: #fff; padding: 12px; font-size: 14px; box-sizing: border-box; outline: none; transition: 0.3s; }
-        textarea:focus, select:focus { border-color: var(--neon); box-shadow: 0 0 10px rgba(0,255,204,0.2); }
+        input, select, textarea {
+            width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 15px; color: #fff; padding: 15px; font-size: 16px; box-sizing: border-box; outline: none;
+        }
         
-        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .toggle-box { display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 15px; }
         
-        button { width: 100%; padding: 16px; border-radius: 12px; border: none; font-weight: 800; font-size: 15px; cursor: pointer; transition: 0.3s; margin-top: 10px; }
-        #genBtn { background: var(--neon); color: #000; box-shadow: 0 4px 20px rgba(0,255,204,0.3); }
-        #genBtn:hover { transform: translateY(-2px); box-shadow: 0 6px 25px rgba(0,255,204,0.5); }
-        #genBtn:disabled { background: #333; color: #666; box-shadow: none; cursor: not-allowed; }
+        .slider-val { display: flex; justify-content: space-between; font-size: 14px; color: var(--primary); margin-top: 5px; }
         
-        #downloadBtn { background: transparent; border: 1.5px solid var(--neon); color: var(--neon); display: none; }
-        #downloadBtn:hover { background: var(--neon); color: #000; }
+        button {
+            width: 100%; padding: 20px; border-radius: 15px; border: none; font-weight: 800; font-size: 18px;
+            cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); margin-top: 10px;
+        }
+        #genBtn { background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%); color: #fff; box-shadow: 0 10px 20px rgba(79, 172, 254, 0.3); }
+        #genBtn:active { transform: scale(0.98); }
+        #genBtn:disabled { background: #334155; opacity: 0.5; }
 
-        /* 狀態顯示 */
-        #status-area { margin-top: auto; padding-top: 20px; }
-        #status-text { font-size: 12px; color: #888; margin-bottom: 8px; }
-        .progress-bar { width: 100%; height: 4px; background: #222; border-radius: 2px; overflow: hidden; }
-        #load-progress { width: 0%; height: 100%; background: var(--neon); transition: 0.5s; }
+        #dlBtn { background: transparent; border: 2px solid var(--primary); color: var(--primary); display: none; margin-top: 15px; }
 
-        /* 音樂播放器樣式 */
-        audio { margin-top: 30px; width: 400px; height: 40px; filter: invert(1) hue-rotate(180deg); display: none; }
-        .visualizer { width: 300px; height: 100px; border-bottom: 2px solid var(--neon); display: flex; align-items: flex-end; gap: 3px; margin-bottom: 20px; }
-        .bar { flex: 1; background: var(--neon); height: 10%; opacity: 0.3; }
+        #status-area { margin-top: 25px; text-align: center; }
+        #status-text { font-size: 12px; color: #94a3b8; margin-bottom: 10px; }
+        .bar-container { height: 4px; background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden; }
+        #loader { width: 0%; height: 100%; background: var(--primary); transition: 0.4s; }
+
+        audio { width: 100%; margin-top: 25px; display: none; filter: hue-rotate(180deg) invert(1); }
     </style>
 </head>
 <body onload="init()">
 
-    <div class="sidebar">
-        <h1>PRO AUDIO STUDIO</h1>
-        <div class="version">BUILD 2026.02 | NO-TRACE MODE</div>
+<div class="app-container">
+    <h1>AUDIO STUDIO</h1>
+    <div class="tagline">ZERO-TRACE PRIVATE ENGINE 2026</div>
 
-        <div class="control-group">
-            <label>音樂風格預設 (Presets)</label>
-            <select id="style">
-                <option value="Lo-fi hip hop, vinyl crackle, cozy, chill">放鬆 Lo-fi (黑膠質感)</option>
-                <option value="80s Synthwave, retro future, neon lights, analog">復古電子 (賽博質感)</option>
-                <option value="Cinematic orchestral, epic, strings, Hans Zimmer style">史詩交響 (好萊塢風格)</option>
-                <option value="Modern K-Pop, high energy, crisp production">現代流行 (K-Pop 節奏)</option>
-                <option value="Jazz lounge, smooth saxophone, coffee shop">爵士酒廊 (薩克斯風)</option>
-                <option value="Techno dark club, heavy bass, industrial">工業硬核 (Techno)</option>
-            </select>
-        </div>
+    <div class="group">
+        <label>音樂預設風格</label>
+        <select id="style">
+            <option value="Lo-fi hip hop, jazzy, chill, vinyl crackle">放鬆 Lo-fi (黑膠)</option>
+            <option value="Epic cinematic, Hans Zimmer style, dramatic">史詩電影 (交響)</option>
+            <option value="80s Japanese City Pop, nostalgic, upbeat">城市流行 (City Pop)</option>
+            <option value="Techno warehouse rave, dark, industrial">重工業電子 (Techno)</option>
+            <option value="Mandopop ballad, emotional piano, high quality">華語流行抒情 (鋼琴)</option>
+        </select>
+    </div>
 
-        <div class="control-group">
-            <label>客製化描述 (Prompt)</label>
-            <textarea id="prompt" placeholder="輸入旋律細節，例如：憂鬱的鋼琴、清脆的雨聲..."></textarea>
-        </div>
+    <div class="group">
+        <label>自定義客製化描述</label>
+        <textarea id="prompt" placeholder="例如：夏日海灘的微風、輕快的木吉他..."></textarea>
+    </div>
 
-        <div class="row">
-            <div class="control-group">
-                <label>長度 (秒)</label>
-                <input type="number" id="duration" value="10" min="2" max="20">
-            </div>
-            <div class="control-group">
-                <label>提示詞權重</label>
-                <input type="number" id="guidance" value="3.5" step="0.5">
-            </div>
-        </div>
-
-        <div class="control-group">
-            <label>生成溫度 (隨機性 0.1 - 1.5)</label>
-            <input type="range" id="temp" min="0.1" max="1.5" step="0.1" value="1.1">
-        </div>
-
-        <button id="genBtn" disabled onclick="generate()">開始專業生成</button>
-        <button id="downloadBtn">下載無浮水印 WAV</button>
-
-        <div id="status-area">
-            <div id="status-text">初始化系統中...</div>
-            <div class="progress-bar"><div id="load-progress"></div></div>
+    <div class="group">
+        <div class="toggle-box">
+            <span style="font-size: 14px; font-weight: bold;">純音樂模式 (Instrumental)</span>
+            <input type="checkbox" id="inst-mode" checked style="width: auto;">
         </div>
     </div>
 
-    <div class="main-view">
-        <div class="visualizer">
-            <div class="bar" style="height: 40%"></div><div class="bar" style="height: 70%"></div><div class="bar" style="height: 50%"></div>
-            <div class="bar" style="height: 90%"></div><div class="bar" style="height: 30%"></div><div class="bar" style="height: 60%"></div>
-        </div>
-        <div style="text-align: center;">
-            <p style="font-size: 14px; color: #555; max-width: 400px;">
-                本工作站採用本地 WebGPU 指令集進行 PCM 運算，生成的音訊不包含任何數位指紋數據，且已自動通過擬人化濾鏡混淆。
-            </p>
-        </div>
-        <audio id="player" controls></audio>
+    <div class="group">
+        <label>生成長度 (2-240秒)</label>
+        <input type="range" id="duration" min="5" max="240" value="30" oninput="dVal.innerText = this.value + ' 秒'">
+        <div class="slider-val"><span id="dVal">30 秒</span><span>Max 4分</span></div>
     </div>
+
+    <div class="group" style="display: none;"> <input type="hidden" id="guidance" value="3.5">
+    </div>
+
+    <button id="genBtn" disabled onclick="generate()">開始生成專業音訊</button>
+    
+    <div id="status-area">
+        <div id="status-text">系統初始化中...</div>
+        <div class="bar-container"><div id="loader"></div></div>
+    </div>
+
+    <audio id="player" controls></audio>
+    <button id="dlBtn">下載無標記 WAV 檔</button>
+</div>
+
+<p style="font-size: 10px; color: #475569; margin-top: 10px;">
+    本引擎採用 WebGPU 本地運算，音效已自動執行擬人化濾鏡。
+</p>
 
 </body>
 </html>
